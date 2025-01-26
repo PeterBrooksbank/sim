@@ -1,4 +1,7 @@
 export default class TerrainGenerator {
+
+    static readonly DefaultGridSize = 250;
+
     width: number;
     height: number;
     seed: number;
@@ -6,7 +9,7 @@ export default class TerrainGenerator {
     ELEVATION_THRESHOLDS: { DEEP_WATER: number; SHALLOW_WATER: number; LOWLAND: number; HIGHLAND: number; MOUNTAIN: number; };
     MOISTURE_THRESHOLDS: { DRY: number; MODERATE: number; WET: number; VERY_WET: number; };
 
-    constructor(width: number = 100, height: number = 100, seed = 0.5) {
+    constructor(width: number = TerrainGenerator.DefaultGridSize, height: number = TerrainGenerator.DefaultGridSize, seed = 0.5) {
         this.width = width;
         this.height = height;
         this.seed = seed;

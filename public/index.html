@@ -1,10 +1,92 @@
-
 <!DOCTYPE html>
 <html>
 <head>
     <title>Terrain Visualization</title>
+    <style>
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 20px;
+        }
+        canvas {
+            border: 1px solid #000;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
 </head>
 <body>
-    <script type="module" src="../dist/index.js"></script>
+    <div class="container">
+        <button id="generateButton">Generate New Terrain</button>
+        <canvas id="terrainCanvas"></canvas>
+    </div>
+    <script>
+        const terrainColors = {
+            'DEEP_WATER': '#000080',
+            'SHALLOW_WATER': '#4169E1',
+            'GRASSLAND': '#90EE90',
+            'SAVANNA': '#F4A460',
+            'FOREST': '#228B22',
+            'RAINFOREST': '#006400',
+            'SHRUBLAND': '#DEB887',
+            'WOODLAND': '#556B2F',
+            'ALPINE_FOREST': '#8B4513',
+            'BARE_MOUNTAIN': '#A0522D',
+            'SNOW_MOUNTAIN': '#DCDCDC',
+            'PEAK': '#FFFFFF'
+        };
+
+        async function generateNewTerrain() {
+            try {
+                const response = await fetch('/api/terrain/generate', { method: 'POST' });
+                const data = await response.json();
+                renderTerrain(data.terrain);
+            } catch (error) {
+                console.error('Failed to generate new terrain:', error);
+            }
+        }
+
+        function renderTerrain(terrain) {
+            const canvas = document.getElementById('terrainCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const cellSize = 8;
+            canvas.width = terrain[0].length * cellSize;
+            canvas.height = terrain.length * cellSize;
+
+            terrain.forEach((row, y) => {
+                row.forEach((cell, x) => {
+                    ctx.fillStyle = terrainColors[cell] || '#000000';
+                    ctx.fillRect(
+                        x * cellSize,
+                        y * cellSize,
+                        cellSize,
+                        cellSize
+                    );
+                });
+            });
+        }
+
+        async function fetchAndRenderTerrain() {
+            const response = await fetch('/api/terrain');
+            const data = await response.json();
+            renderTerrain(data.terrain);
+        }
+
+        document.getElementById('generateButton').addEventListener('click', generateNewTerrain);
+        fetchAndRenderTerrain();
+    </script>
 </body>
 </html>
