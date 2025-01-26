@@ -230,25 +230,17 @@ export default class TerrainGenerator {
         return Math.sqrt(dx * dx + dy * dy);
     }
 
-    private generateCenterBasedElevation(): number[][] {
+    // Rename method since it's no longer center-based
+    private generateElevation(): number[][] {
         const elevation = Array(this.height).fill(0).map(() => Array(this.width).fill(0));
         for (let y = 0; y < this.height; y++) {
             for (let x = 0; x < this.width; x++) {
-                // Get base noise value
-                //this.generateOctaves(x / this.width, y / this.height, noiseGenerator);
-                const noise = this.noiseGenerator.fractal(x, y, 4, 0.5, 2)
-
-                // Calculate distance from center (0 to ~0.7)
-                const distanceFromCenter = this.getDistanceFromCenter(x, y);
-
-                // Create elevation gradient that decreases from center
-                const centerInfluence = 1 - Math.pow(distanceFromCenter * 1.4, 2);
-
-                // Combine noise with center influence
-                elevation[y][x] = (noise * 0.6 + centerInfluence * 0.4);
-
+                // Use pure noise for elevation
+                const noise = this.noiseGenerator.fractal(x, y, 4, 0.5, 2);
+                //console.log(noise);
                 // Normalize to ensure values stay in 0-1 range
-                elevation[y][x] = Math.max(0, Math.min(1, elevation[y][x]));
+                elevation[y][x] = Math.max(0, Math.min(1, noise));
+                //console.log(elevation[y][x]);
             }
         }
 
@@ -324,10 +316,9 @@ export default class TerrainGenerator {
         return rivers;
     }
 
-    generate() {       
-        
-        // Generate base elevation using center-based approach
-        const elevation = this.generateCenterBasedElevation();
+    generate() {
+        // Update method call
+        const elevation = this.generateElevation();
 
         // Simulate water flow and erosion
         const { elevation: erodedElevation, water } = this.simulateWaterFlow(elevation);
