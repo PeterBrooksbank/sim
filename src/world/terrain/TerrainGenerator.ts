@@ -38,7 +38,7 @@ export default class TerrainGenerator {
         return (Math.sin(dot) * 43758.5453) % 1;
     }
 
-    noise(x: number, y: number, frequency = 1) {
+    noise(x: number, y: number, frequency = 10) {
         const x0 = Math.floor(x * frequency);
         const x1 = x0 + 1;
         const y0 = Math.floor(y * frequency);
@@ -266,6 +266,75 @@ export default class TerrainGenerator {
         return elevation;
     }
 
+    private readonly RIVER_PARAMS = {
+        SOURCE_THRESHOLD: 0.7,    // Minimum elevation for river sources
+        FLOW_THRESHOLD: 0.01,     // Minimum slope needed for river flow
+        MAX_RIVERS: 15,          // Maximum number of rivers to generate
+        MIN_LENGTH: 10           // Minimum length for a river to be kept
+    };
+
+    private generateRivers(elevation: number[][]): Set<string> {
+        const rivers = new Set<string>();
+        let riverCount = 0;
+
+        // Find potential river sources (high elevation points)
+        const sources: [number, number][] = [];
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                if (elevation[y][x] > this.RIVER_PARAMS.SOURCE_THRESHOLD) {
+                    sources.push([x, y]);
+                }
+            }
+        }
+
+        // Shuffle sources randomly
+        sources.sort(() => Math.random() - 0.5);
+
+        // Generate rivers from each source
+        for (const [startX, startY] of sources) {
+            if (riverCount >= this.RIVER_PARAMS.MAX_RIVERS) break;
+
+            let currentX = startX;
+            let currentY = startY;
+            const riverPath = new Set<string>();
+
+            while (true) {
+                riverPath.add(`${currentX},${currentY}`);
+                
+                // Find lowest neighbor
+                const neighbors = this.getNeighbors(currentX, currentY);
+                let lowestElevation = elevation[currentY][currentX];
+                let nextX = currentX;
+                let nextY = currentY;
+
+                for (const [nx, ny] of neighbors) {
+                    if (elevation[ny][nx] < lowestElevation) {
+                        lowestElevation = elevation[ny][nx];
+                        nextX = nx;
+                        nextY = ny;
+                    }
+                }
+
+                // Stop if no lower point found or reached water
+                if (nextX === currentX && nextY === currentY || 
+                    elevation[nextY][nextX] < this.ELEVATION_THRESHOLDS.SHALLOW_WATER) {
+                    break;
+                }
+
+                currentX = nextX;
+                currentY = nextY;
+            }
+
+            // Only keep rivers that are long enough
+            if (riverPath.size >= this.RIVER_PARAMS.MIN_LENGTH) {
+                riverPath.forEach(coord => rivers.add(coord));
+                riverCount++;
+            }
+        }
+
+        return rivers;
+    }
+
     generate() {
         // Generate base elevation using center-based approach
         const elevation = this.generateCenterBasedElevation();
@@ -276,19 +345,26 @@ export default class TerrainGenerator {
         // Calculate moisture levels
         const moisture = this.calculateMoisture(erodedElevation, water);
 
+        // Generate rivers
+        const rivers = this.generateRivers(erodedElevation);
+
         // Determine biomes based on elevation and moisture
         this.grid = erodedElevation.map((row: any[], y: number) =>
-            row.map((elevation: any, x: number) => this.getBiome(elevation, moisture[y][x]))
+            row.map((elevation: any, x: number) => {
+                const baseType = this.getBiome(elevation, moisture[y][x]);
+                return rivers.has(`${x},${y}`) ? 'RIVER' : baseType;
+            })
         );
 
-        // Smooth the terrain to eliminate orphaned cells
-        this.grid = this.smoothTerrain(this.grid);
+        /* // Smooth the terrain to eliminate orphaned cells
+        this.grid = this.smoothTerrain(this.grid); */
 
         return {
             terrain: this.grid,
             elevation: erodedElevation,
             water,
-            moisture
+            moisture,
+            rivers
         };
     }
 

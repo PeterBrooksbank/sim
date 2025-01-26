@@ -25,12 +25,30 @@
         button:hover {
             background-color: #45a049;
         }
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        .info-panel {
+            margin-top: 20px;
+            font-family: monospace;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <button id="generateButton">Generate New Terrain</button>
+        <div class="controls">
+            <button id="generateButton">Generate New Terrain</button>
+            <select id="viewMode">
+                <option value="terrain">Terrain</option>
+                <option value="elevation">Elevation</option>
+                <option value="moisture">Moisture</option>
+                <option value="water">Water</option>
+            </select>
+        </div>
         <canvas id="terrainCanvas"></canvas>
+        <div class="info-panel" id="infoPanel"></div>
     </div>
     <script>
         const terrainColors = {
@@ -45,47 +63,101 @@
             'ALPINE_FOREST': '#8B4513',
             'BARE_MOUNTAIN': '#A0522D',
             'SNOW_MOUNTAIN': '#DCDCDC',
-            'PEAK': '#FFFFFF'
+            'PEAK': '#FFFFFF',
+            'RIVER': '#4169E1'  // Royal Blue for rivers
         };
 
-        async function generateNewTerrain() {
-            try {
-                const response = await fetch('/api/terrain/generate', { method: 'POST' });
-                const data = await response.json();
-                renderTerrain(data.terrain);
-            } catch (error) {
-                console.error('Failed to generate new terrain:', error);
-            }
-        }
+        let worldState = null;
 
-        function renderTerrain(terrain) {
+        function renderWorldState(mode = 'terrain') {
             const canvas = document.getElementById('terrainCanvas');
             const ctx = canvas.getContext('2d');
-
             const cellSize = 8;
+
+            if (!worldState || !worldState.terrain) return;
+
+            const terrain = worldState.terrain;
             canvas.width = terrain[0].length * cellSize;
             canvas.height = terrain.length * cellSize;
 
             terrain.forEach((row, y) => {
                 row.forEach((cell, x) => {
-                    ctx.fillStyle = terrainColors[cell] || '#000000';
-                    ctx.fillRect(
-                        x * cellSize,
-                        y * cellSize,
-                        cellSize,
-                        cellSize
-                    );
+                    let color;
+                    switch(mode) {
+                        case 'elevation':
+                            const elevation = worldState.elevation[y][x];
+                            color = `hsl(0, 0%, ${elevation * 100}%)`;
+                            break;
+                        case 'moisture':
+                            const moisture = worldState.moisture[y][x];
+                            color = `hsl(200, ${moisture * 100}%, 50%)`;
+                            break;
+                        case 'water':
+                            const water = worldState.water[y][x];
+                            color = `hsl(220, 100%, ${water * 100}%)`;
+                            break;
+                        default:
+                            color = terrainColors[cell] || '#000000';
+                    }
+                    
+                    ctx.fillStyle = color;
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 });
             });
+
+            updateInfoPanel();
+        }
+
+        function updateInfoPanel() {
+            const panel = document.getElementById('infoPanel');
+            const stats = calculateStats();
+            panel.innerHTML = `
+                <h3>World Statistics</h3>
+                <p>Water Coverage: ${stats.waterCoverage}%</p>
+                <p>Average Elevation: ${stats.avgElevation}</p>
+                <p>River Count: ${stats.riverCount}</p>
+            `;
+        }
+
+        function calculateStats() {
+            if (!worldState) return {};
+            
+            const waterTiles = worldState.terrain.flat()
+                .filter(t => t === 'DEEP_WATER' || t === 'SHALLOW_WATER').length;
+            const totalTiles = worldState.terrain.flat().length;
+            
+            return {
+                waterCoverage: ((waterTiles / totalTiles) * 100).toFixed(1),
+                avgElevation: (average(worldState.elevation.flat())).toFixed(2),
+                riverCount: worldState.rivers.length
+            };
+        }
+
+        function average(arr) {
+            return arr.reduce((a, b) => a + b, 0) / arr.length;
+        }
+
+        async function generateNewTerrain() {
+            try {
+                const response = await fetch('/api/terrain/generate', { method: 'POST' });
+                worldState = await response.json();
+                renderWorldState(document.getElementById('viewMode').value);
+            } catch (error) {
+                console.error('Failed to generate new terrain:', error);
+            }
         }
 
         async function fetchAndRenderTerrain() {
             const response = await fetch('/api/terrain');
-            const data = await response.json();
-            renderTerrain(data.terrain);
+            worldState = await response.json();
+            renderWorldState('terrain');
         }
 
         document.getElementById('generateButton').addEventListener('click', generateNewTerrain);
+        document.getElementById('viewMode').addEventListener('change', (e) => {
+            renderWorldState(e.target.value);
+        });
+        
         fetchAndRenderTerrain();
     </script>
 </body>

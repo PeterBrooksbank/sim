@@ -10,6 +10,7 @@ export default class TerrainRenderer {
             BROWN: '\x1b[43m',
             GRAY: '\x1b[100m',
             WHITE: '\x1b[47m',
+            RIVER: '\x1b[94m',  // Add bright blue for rivers
         }
     };
 
@@ -25,7 +26,8 @@ export default class TerrainRenderer {
         'ALPINE_FOREST': { char: '△', color: TerrainRenderer.ANSI_COLORS.BG.BROWN },
         'BARE_MOUNTAIN': { char: '▲', color: TerrainRenderer.ANSI_COLORS.BG.GRAY },
         'SNOW_MOUNTAIN': { char: '▲', color: TerrainRenderer.ANSI_COLORS.BG.WHITE },
-        'PEAK': { char: '▲', color: TerrainRenderer.ANSI_COLORS.BG.WHITE }
+        'PEAK': { char: '▲', color: TerrainRenderer.ANSI_COLORS.BG.WHITE },
+        'RIVER': { char: '≋', color: TerrainRenderer.ANSI_COLORS.BG.RIVER },
     };
 
     static renderAscii(terrain: string[][]): void {

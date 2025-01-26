@@ -19,15 +19,32 @@ export class Api {
 
         this.app.get('/api/terrain', (req, res) => {
             res.json({
-                terrain: WorldState.Terrain
+                terrain: WorldState.Terrain,
+                elevation: WorldState.Elevation,
+                water: WorldState.Water,
+                moisture: WorldState.Moisture,
+                rivers: Array.from(WorldState.Rivers || [])
             });
         });
 
         this.app.post('/api/terrain/generate', (req, res) => {
             const generator = new TerrainGenerator(TerrainGenerator.DefaultGridSize, TerrainGenerator.DefaultGridSize, Math.random());
-            const { terrain } = generator.generate();
+            const { terrain, elevation, water, moisture, rivers } = generator.generate();
+            
+            // Store complete state
             WorldState.Terrain = terrain;
-            res.json({ terrain });
+            WorldState.Elevation = elevation;
+            WorldState.Water = water;
+            WorldState.Moisture = moisture;
+            WorldState.Rivers = rivers;
+
+            res.json({
+                terrain,
+                elevation,
+                water,
+                moisture,
+                rivers: Array.from(rivers)
+            });
         });
     }
 

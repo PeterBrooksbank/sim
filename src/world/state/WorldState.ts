@@ -1,3 +1,7 @@
 export default class WorldState {
-    static Terrain: any[][];
+    static Terrain: string[][];
+    static Elevation: number[][];
+    static Water: number[][];
+    static Moisture: number[][];
+    static Rivers: Set<string>;
 }
