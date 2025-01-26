@@ -2,7 +2,7 @@ import NoiseGenerator from "./NoiseGenerator";
 
 export default class TerrainGenerator {
 
-    static readonly DefaultGridSize = 250;
+    static readonly DefaultGridSize = 1000;
 
     width: number;
     height: number;
@@ -11,6 +11,7 @@ export default class TerrainGenerator {
     ELEVATION_THRESHOLDS: { DEEP_WATER: number; SHALLOW_WATER: number; LOWLAND: number; HIGHLAND: number; MOUNTAIN: number; };
     MOISTURE_THRESHOLDS: { DRY: number; MODERATE: number; WET: number; VERY_WET: number; };
     noiseGenerator: NoiseGenerator;
+    startTime: [number, number] = [0, 0];
 
     constructor(width: number = TerrainGenerator.DefaultGridSize, height: number = TerrainGenerator.DefaultGridSize, seed = 0.5) {
         this.width = width;
@@ -68,7 +69,8 @@ export default class TerrainGenerator {
 
     // Simulate water flow and erosion
     simulateWaterFlow(elevation: number[][], iterations = 50) {
-        const water = Array(this.height).fill(0).map(() => Array(this.width).fill(0));
+        this.Log('Simulating water flow...');
+        const water = Array(this.height).fill(0.01).map(() => Array(this.width).fill(0.01));
         const sediment = Array(this.height).fill(0).map(() => Array(this.width).fill(0));
 
         // Constants for water simulation
@@ -80,15 +82,17 @@ export default class TerrainGenerator {
 
         for (let iter = 0; iter < iterations; iter++) {
             // Add rainfall
-            for (let y = 0; y < this.height; y++) {
-                for (let x = 0; x < this.width; x++) {
-                    water[y][x] += rainAmount;
+            if (iter != 0) {
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        water[y][x] += rainAmount;
+                    }
                 }
             }
 
             // Simulate water flow
             const newWater = Array(this.height).fill(0).map(() => Array(this.width).fill(0));
-            const newSediment = Array(this.height).fill(0).map(() => Array(this.width).fill(0));
+            /* const newSediment = Array(this.height).fill(0).map(() => Array(this.width).fill(0)); */
 
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
@@ -98,7 +102,6 @@ export default class TerrainGenerator {
                     const neighbors = this.getNeighbors(x, y);
                     const currentHeight = elevation[y][x] + water[y][x];
 
-                    let totalFlow = 0;
                     const flows = neighbors.map(([nx, ny]) => {
                         const neighborHeight = elevation[ny][nx] + water[ny][nx];
                         const heightDiff = currentHeight - neighborHeight;
@@ -127,6 +130,9 @@ export default class TerrainGenerator {
                         newWater[y][x] += water[y][x];
                     }
 
+                    newWater[y][x] *= (1 - evaporationRate);
+                    water[y][x] = newWater[y][x];
+
                     // Deposit sediment
                     if (sediment[y][x] > 0) {
                         const depositionAmount = Math.min(depositionRate * sediment[y][x], sediment[y][x]);
@@ -136,7 +142,7 @@ export default class TerrainGenerator {
                 }
             }
 
-            // Evaporation
+            /* // Evaporation
             for (let y = 0; y < this.height; y++) {
                 for (let x = 0; x < this.width; x++) {
                     newWater[y][x] *= (1 - evaporationRate);
@@ -149,8 +155,10 @@ export default class TerrainGenerator {
                     water[y][x] = newWater[y][x];
                     sediment[y][x] = newSediment[y][x];
                 }
-            }
+            } */
         }
+
+        this.Log('Water flow simulation complete');
 
         return { elevation, water };
     }
@@ -159,19 +167,29 @@ export default class TerrainGenerator {
         const neighbors: any[][] = [];
         const directions = [[-1, 0], [1, 0], [0, -1], [0, 1]];
 
-        directions.forEach(([dx, dy]) => {
+        for (let i = 0; i < 4; i++) {
+            const nx = x + directions[i][0];
+            const ny = y + directions[i][1];
+            if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
+                neighbors.push([nx, ny]);
+            }
+        }
+
+        /* directions.forEach(([dx, dy]) => {
             const nx = x + dx;
             const ny = y + dy;
             if (nx >= 0 && nx < this.width && ny >= 0 && ny < this.height) {
                 neighbors.push([nx, ny]);
             }
-        });
+        }); */
 
         return neighbors;
     }
 
     // Calculate moisture levels based on water accumulation and elevation
     calculateMoisture(elevation: number[][], water: any[][]) {
+        this.Log('Calculating moisture levels...');
+        let maxMoisture = 0;
         const moisture = Array(this.height).fill(0).map(() => Array(this.width).fill(0));
 
         // Base moisture from water bodies
@@ -188,11 +206,13 @@ export default class TerrainGenerator {
                         moisture[ny][nx] += water[y][x] * 0.2;
                     });
                 }
+
+                maxMoisture = Math.max(maxMoisture, moisture[y][x]);
             }
         }
 
-        // Normalize moisture values
-        const maxMoisture = Math.max(...moisture.flat());
+        this.Log('Moisture levels calculated');
+
         return moisture.map(row => row.map(val => val / maxMoisture));
     }
 
@@ -213,18 +233,18 @@ export default class TerrainGenerator {
         // Apply neighboring biome influence for specific types
         if (this.BIOME_INFLUENCE.hasOwnProperty(biomeType)) {
             const neighbors = this.getNeighbors(x, y);
-            const neighborBiomes = neighbors.map(([nx, ny]) => 
+            const neighborBiomes = neighbors.map(([nx, ny]) =>
                 this.grid[ny]?.[nx] || biomeType
             );
 
             // Count matching neighbors
             const matchingNeighbors = neighborBiomes.filter(b => b === biomeType).length;
-            
+
             // If not enough matching neighbors, possibly change biome
             if (matchingNeighbors < 2) {
                 const influence = this.BIOME_INFLUENCE[biomeType];
                 const noiseValue = this.noiseGenerator.noise(x, y);
-                
+
                 if (noiseValue > influence) {
                     // Try to match a neighboring biome instead
                     const commonBiome = this.getMostCommonBiome(neighborBiomes);
@@ -238,13 +258,13 @@ export default class TerrainGenerator {
         // Enhanced clustering for grasslands
         if (biomeType === 'GRASSLAND') {
             const neighbors = this.getNeighbors(x, y);
-            const neighborBiomes = neighbors.map(([nx, ny]) => 
+            const neighborBiomes = neighbors.map(([nx, ny]) =>
                 this.grid[ny]?.[nx] || biomeType
             );
 
             // Count matching neighbors
             const matchingNeighbors = neighborBiomes.filter(b => b === biomeType).length;
-            
+
             // Stronger tendency to maintain biome type if it matches neighbors
             if (matchingNeighbors >= 2) {
                 return biomeType;
@@ -312,6 +332,7 @@ export default class TerrainGenerator {
 
     // Rename method since it's no longer center-based
     private generateElevation(): number[][] {
+        this.Log('Generating elevation...');
         const elevation = Array(this.height).fill(0).map(() => Array(this.width).fill(0));
         for (let y = 0; y < this.height; y++) {
             for (let x = 0; x < this.width; x++) {
@@ -323,7 +344,7 @@ export default class TerrainGenerator {
                 //console.log(elevation[y][x]);
             }
         }
-
+        this.Log('Elevation generated');
         return elevation;
     }
 
@@ -335,6 +356,7 @@ export default class TerrainGenerator {
     };
 
     private generateRivers(elevation: number[][]): Set<string> {
+        this.Log('Generating rivers...');
         const rivers = new Set<string>();
         let riverCount = 0;
 
@@ -393,10 +415,13 @@ export default class TerrainGenerator {
             }
         }
 
+        this.Log('Rivers generated');
+
         return rivers;
     }
 
     private validateDeepWater(terrain: string[][]): string[][] {
+        this.Log('Validating deep water connections...');
         const validated = terrain.map(row => [...row]);
         let hasChanges;
 
@@ -420,28 +445,36 @@ export default class TerrainGenerator {
             }
         } while (hasChanges);
 
+        this.Log('Deep water connections validated');
+
         return validated;
     }
 
     generate() {
+        this.startTime = process.hrtime();
+        this.Log('Generating terrain...');
         const elevation = this.generateElevation();
         const { elevation: erodedElevation, water } = this.simulateWaterFlow(elevation);
         const moisture = this.calculateMoisture(erodedElevation, water);
 
         // Initialize grid with basic terrain
         this.grid = Array(this.height).fill(0).map(() => Array(this.width).fill(null));
-        
+
+        this.Log('Assigning biomes...');
         // First pass: basic biome assignment
         for (let y = 0; y < this.height; y++) {
             for (let x = 0; x < this.width; x++) {
                 this.grid[y][x] = this.getBaseBiome(erodedElevation[y][x], moisture[y][x]);
             }
         }
+        this.Log('Biomes assigned');
 
+        this.Log('Biome clustering...');
         // Second pass: biome clustering
         const finalGrid = this.grid.map((row, y) =>
             row.map((_, x) => this.getBiome(erodedElevation[y][x], moisture[y][x], x, y))
         );
+        this.Log('Biome clustering complete');
 
         // Generate rivers
         const rivers = this.generateRivers(erodedElevation);
@@ -461,6 +494,11 @@ export default class TerrainGenerator {
             moisture,
             rivers
         };
+    }
+
+    private Log(message: string) {
+        const elapsed = process.hrtime(this.startTime);
+        console.log(`[${(elapsed[0] + elapsed[1] / 1e9).toFixed(2)}s] ${message}`);
     }
 
     private smoothTerrain(terrain: string[][]): string[][] {
