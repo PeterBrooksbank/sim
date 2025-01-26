@@ -45,6 +45,7 @@ export class Api {
                 moisture,
                 rivers: Array.from(rivers)
             });
+            console.log('Terrain distribution:', generator.getTerrainStats());
         });
     }
 

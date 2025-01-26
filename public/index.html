@@ -7,8 +7,31 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 20px;
+            gap: 10px;
             padding: 20px;
+        }
+        .info-panel {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            width: 100%;
+            max-width: 800px;
+            display: flex;
+            justify-content: space-around;
+        }
+        .stat-item {
+            text-align: center;
+        }
+        .stat-value {
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #333;
+        }
+        .stat-label {
+            font-size: 0.9em;
+            color: #666;
         }
         canvas {
             border: 1px solid #000;
@@ -30,14 +53,11 @@
             gap: 10px;
             margin-bottom: 20px;
         }
-        .info-panel {
-            margin-top: 20px;
-            font-family: monospace;
-        }
     </style>
 </head>
 <body>
     <div class="container">
+        <div class="info-panel" id="infoPanel"></div>
         <div class="controls">
             <button id="generateButton">Generate New Terrain</button>
             <select id="viewMode">
@@ -48,7 +68,6 @@
             </select>
         </div>
         <canvas id="terrainCanvas"></canvas>
-        <div class="info-panel" id="infoPanel"></div>
     </div>
     <script>
         const terrainColors = {
@@ -112,10 +131,18 @@
             const panel = document.getElementById('infoPanel');
             const stats = calculateStats();
             panel.innerHTML = `
-                <h3>World Statistics</h3>
-                <p>Water Coverage: ${stats.waterCoverage}%</p>
-                <p>Average Elevation: ${stats.avgElevation}</p>
-                <p>River Count: ${stats.riverCount}</p>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.waterCoverage}%</div>
+                    <div class="stat-label">Water Coverage</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.avgElevation}</div>
+                    <div class="stat-label">Avg Elevation</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-value">${stats.riverCount}</div>
+                    <div class="stat-label">Rivers</div>
+                </div>
             `;
         }
 

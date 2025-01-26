@@ -1,3 +1,5 @@
+import NoiseGenerator from "./NoiseGenerator";
+
 export default class TerrainGenerator {
 
     static readonly DefaultGridSize = 250;
@@ -8,6 +10,7 @@ export default class TerrainGenerator {
     grid: any[][];
     ELEVATION_THRESHOLDS: { DEEP_WATER: number; SHALLOW_WATER: number; LOWLAND: number; HIGHLAND: number; MOUNTAIN: number; };
     MOISTURE_THRESHOLDS: { DRY: number; MODERATE: number; WET: number; VERY_WET: number; };
+    noiseGenerator: NoiseGenerator;
 
     constructor(width: number = TerrainGenerator.DefaultGridSize, height: number = TerrainGenerator.DefaultGridSize, seed = 0.5) {
         this.width = width;
@@ -31,6 +34,8 @@ export default class TerrainGenerator {
             WET: 0.8,
             VERY_WET: 1.0
         };
+
+        this.noiseGenerator = new NoiseGenerator(seed);
     }
 
     random(x: number, y: number) {
@@ -59,22 +64,6 @@ export default class TerrainGenerator {
 
     lerp(a: number, b: number, t: number) {
         return a + t * (b - a);
-    }
-
-    generateOctaves(x: number, y: number, octaves = 4) {
-        let value = 0;
-        let amplitude = 1;
-        let frequency = 1;
-        let maxValue = 0;
-
-        for (let i = 0; i < octaves; i++) {
-            value += this.noise(x, y, frequency) * amplitude;
-            maxValue += amplitude;
-            amplitude *= 0.5;
-            frequency *= 2;
-        }
-
-        return value / maxValue;
     }
 
     // Simulate water flow and erosion
@@ -243,21 +232,21 @@ export default class TerrainGenerator {
 
     private generateCenterBasedElevation(): number[][] {
         const elevation = Array(this.height).fill(0).map(() => Array(this.width).fill(0));
-        
         for (let y = 0; y < this.height; y++) {
             for (let x = 0; x < this.width; x++) {
                 // Get base noise value
-                const noise = this.generateOctaves(x / this.width, y / this.height);
-                
+                //this.generateOctaves(x / this.width, y / this.height, noiseGenerator);
+                const noise = this.noiseGenerator.fractal(x, y, 4, 0.5, 2)
+
                 // Calculate distance from center (0 to ~0.7)
                 const distanceFromCenter = this.getDistanceFromCenter(x, y);
-                
+
                 // Create elevation gradient that decreases from center
                 const centerInfluence = 1 - Math.pow(distanceFromCenter * 1.4, 2);
-                
+
                 // Combine noise with center influence
-                elevation[y][x] = (noise * 0.6 + centerInfluence * 0.45);
-                
+                elevation[y][x] = (noise * 0.6 + centerInfluence * 0.4);
+
                 // Normalize to ensure values stay in 0-1 range
                 elevation[y][x] = Math.max(0, Math.min(1, elevation[y][x]));
             }
@@ -300,7 +289,7 @@ export default class TerrainGenerator {
 
             while (true) {
                 riverPath.add(`${currentX},${currentY}`);
-                
+
                 // Find lowest neighbor
                 const neighbors = this.getNeighbors(currentX, currentY);
                 let lowestElevation = elevation[currentY][currentX];
@@ -316,7 +305,7 @@ export default class TerrainGenerator {
                 }
 
                 // Stop if no lower point found or reached water
-                if (nextX === currentX && nextY === currentY || 
+                if (nextX === currentX && nextY === currentY ||
                     elevation[nextY][nextX] < this.ELEVATION_THRESHOLDS.SHALLOW_WATER) {
                     break;
                 }
@@ -335,7 +324,8 @@ export default class TerrainGenerator {
         return rivers;
     }
 
-    generate() {
+    generate() {       
+        
         // Generate base elevation using center-based approach
         const elevation = this.generateCenterBasedElevation();
 
@@ -377,7 +367,7 @@ export default class TerrainGenerator {
                 for (let x = 0; x < this.width; x++) {
                     const neighbors = this.getNeighbors(x, y);
                     const currentType = terrain[y][x];
-                    
+
                     // Count terrain types in neighborhood
                     const terrainCounts = new Map<string, number>();
                     neighbors.forEach(([nx, ny]) => {
