@@ -9,6 +9,10 @@ export class Api {
 
     constructor() {
         this.app = express();
+        
+        // Add static file serving before routes
+        this.app.use(express.static(path.join(__dirname, '../../public')));
+        
         this.setupRoutes();
     }
 
@@ -23,12 +27,14 @@ export class Api {
                 elevation: WorldState.Elevation,
                 water: WorldState.Water,
                 moisture: WorldState.Moisture,
-                rivers: Array.from(WorldState.Rivers || [])
+                rivers: Array.from(WorldState.Rivers || []),
+                seed: WorldState.Seed
             });
         });
 
         this.app.post('/api/terrain/generate', (req, res) => {
-            const generator = new TerrainGenerator(TerrainGenerator.DefaultGridSize, TerrainGenerator.DefaultGridSize, Math.random());
+            const seed = req.query.seed ? parseFloat(req.query.seed as string) : Math.random();
+            const generator = new TerrainGenerator(TerrainGenerator.DefaultGridSize, TerrainGenerator.DefaultGridSize, seed);
             const { terrain, elevation, water, moisture, rivers } = generator.generate();
             
             // Store complete state
@@ -37,13 +43,15 @@ export class Api {
             WorldState.Water = water;
             WorldState.Moisture = moisture;
             WorldState.Rivers = rivers;
+            WorldState.Seed = generator.seed;  // Add this line
 
             res.json({
                 terrain,
                 elevation,
                 water,
                 moisture,
-                rivers: Array.from(rivers)
+                rivers: Array.from(rivers),
+                seed: generator.seed    // Add this line
             });
             console.log('Terrain distribution:', generator.getTerrainStats());
         });

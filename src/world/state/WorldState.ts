@@ -4,4 +4,5 @@ export default class WorldState {
     static Water: number[][];
     static Moisture: number[][];
     static Rivers: Set<string>;
+    static Seed: number;
 }

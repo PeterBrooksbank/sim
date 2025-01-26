@@ -2,7 +2,7 @@ import NoiseGenerator from "./NoiseGenerator";
 
 export default class TerrainGenerator {
 
-    static readonly DefaultGridSize = 1000;
+    static readonly DefaultGridSize = 250;
 
     width: number;
     height: number;

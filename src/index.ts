@@ -15,6 +15,7 @@ async function main() {
     WorldState.Water = water;
     WorldState.Moisture = moisture;
     WorldState.Rivers = rivers;
+    WorldState.Seed = generator.seed;
     
     // ASCII visualization
     //TerrainRenderer.renderAscii(terrain);
