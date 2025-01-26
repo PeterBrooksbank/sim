@@ -1,0 +1,15 @@
+{
+  "name": "Sim",
+  "version": "0.0.1",
+  "description": "Playing around with creating a basic game sim",
+  "main": "index.js",
+  "author": "Peter Brooksbank",
+  "license": "MIT",
+  "devDependencies": {
+    "@tsconfig/recommended": "^1.0.8"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "tsc && node dist/index.js"
+  }
+}
