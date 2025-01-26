@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html>
+
 <head>
     <title>Terrain Visualization</title>
     <style>
@@ -10,6 +11,7 @@
             gap: 10px;
             padding: 20px;
         }
+
         .info-panel {
             font-family: monospace;
             background-color: #f5f5f5;
@@ -21,21 +23,26 @@
             display: flex;
             justify-content: space-around;
         }
+
         .stat-item {
             text-align: center;
         }
+
         .stat-value {
             font-size: 1.2em;
             font-weight: bold;
             color: #333;
         }
+
         .stat-label {
             font-size: 0.9em;
             color: #666;
         }
+
         canvas {
             border: 1px solid #000;
         }
+
         button {
             padding: 10px 20px;
             font-size: 16px;
@@ -45,16 +52,54 @@
             border: none;
             border-radius: 4px;
         }
+
         button:hover {
             background-color: #45a049;
         }
+
         .controls {
             display: flex;
             gap: 10px;
             margin-bottom: 20px;
         }
+
+        .color-map {
+            font-family: monospace;
+            background-color: #f5f5f5;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            width: 100%;
+            max-width: 800px;
+        }
+
+        .color-map-title {
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .color-map-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+
+        .color-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .color-sample {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #ccc;
+            border-radius: 3px;
+        }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="info-panel" id="infoPanel"></div>
@@ -67,14 +112,17 @@
                 <option value="water">Water</option>
             </select>
         </div>
-        <canvas id="terrainCanvas"></canvas>
+        <canvas id="terrainCanvas" style="height: 700px;"></canvas>
+        <div class="color-map">
+            <div class="color-map-title">Terrain Types</div>
+            <div class="color-map-grid" id="colorMap"></div>
+        </div>
     </div>
     <script>
         const terrainColors = {
             'DEEP_WATER': '#000080',
             'SHALLOW_WATER': '#4169E1',
             'GRASSLAND': '#90EE90',
-            'SAVANNA': '#F4A460',
             'FOREST': '#228B22',
             'RAINFOREST': '#006400',
             'SHRUBLAND': '#DEB887',
@@ -102,7 +150,7 @@
             terrain.forEach((row, y) => {
                 row.forEach((cell, x) => {
                     let color;
-                    switch(mode) {
+                    switch (mode) {
                         case 'elevation':
                             const elevation = worldState.elevation[y][x];
                             color = `hsl(0, 0%, ${elevation * 100}%)`;
@@ -118,7 +166,7 @@
                         default:
                             color = terrainColors[cell] || '#000000';
                     }
-                    
+
                     ctx.fillStyle = color;
                     ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
                 });
@@ -148,11 +196,11 @@
 
         function calculateStats() {
             if (!worldState) return {};
-            
+
             const waterTiles = worldState.terrain.flat()
                 .filter(t => t === 'DEEP_WATER' || t === 'SHALLOW_WATER').length;
             const totalTiles = worldState.terrain.flat().length;
-            
+
             return {
                 waterCoverage: ((waterTiles / totalTiles) * 100).toFixed(1),
                 avgElevation: (average(worldState.elevation.flat())).toFixed(2),
@@ -180,12 +228,35 @@
             renderWorldState('terrain');
         }
 
+        function createColorMap() {
+            const colorMap = document.getElementById('colorMap');
+            Object.entries(terrainColors).forEach(([type, color]) => {
+                const item = document.createElement('div');
+                item.className = 'color-item';
+
+                const sample = document.createElement('div');
+                sample.className = 'color-sample';
+                sample.style.backgroundColor = color;
+
+                const label = document.createElement('span');
+                label.textContent = type.replace(/_/g, ' ').toLowerCase();
+
+                item.appendChild(sample);
+                item.appendChild(label);
+                colorMap.appendChild(item);
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            createColorMap();
+            fetchAndRenderTerrain();
+        });
+
         document.getElementById('generateButton').addEventListener('click', generateNewTerrain);
         document.getElementById('viewMode').addEventListener('change', (e) => {
             renderWorldState(e.target.value);
         });
-        
-        fetchAndRenderTerrain();
     </script>
 </body>
+
 </html>

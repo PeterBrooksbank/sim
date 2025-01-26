@@ -29,8 +29,8 @@ export default class TerrainGenerator {
 
         // Moisture thresholds for biome determination
         this.MOISTURE_THRESHOLDS = {
-            DRY: 0.3,
-            MODERATE: 0.6,
+            DRY: 0.3,        // Threshold for grasslands
+            MODERATE: 0.6,    // Threshold for forests
             WET: 0.8,
             VERY_WET: 1.0
         };
@@ -196,14 +196,76 @@ export default class TerrainGenerator {
         return moisture.map(row => row.map(val => val / maxMoisture));
     }
 
-    // Determine biome based on elevation and moisture
-    getBiome(elevation: number, moisture: number) {
+    private readonly BIOME_INFLUENCE = {
+        'GRASSLAND': 0.25,
+        'FOREST': 0.2,
+        'WOODLAND': 0.2,
+        'SHRUBLAND': 0.15
+    };
+
+    getBiome(elevation: number, moisture: number, x: number, y: number): string {
         if (elevation < this.ELEVATION_THRESHOLDS.DEEP_WATER) return 'DEEP_WATER';
         if (elevation < this.ELEVATION_THRESHOLDS.SHALLOW_WATER) return 'SHALLOW_WATER';
 
+        // Get base biome type
+        let biomeType = this.getBaseBiome(elevation, moisture) as keyof typeof this.BIOME_INFLUENCE;
+
+        // Apply neighboring biome influence for specific types
+        if (this.BIOME_INFLUENCE.hasOwnProperty(biomeType)) {
+            const neighbors = this.getNeighbors(x, y);
+            const neighborBiomes = neighbors.map(([nx, ny]) => 
+                this.grid[ny]?.[nx] || biomeType
+            );
+
+            // Count matching neighbors
+            const matchingNeighbors = neighborBiomes.filter(b => b === biomeType).length;
+            
+            // If not enough matching neighbors, possibly change biome
+            if (matchingNeighbors < 2) {
+                const influence = this.BIOME_INFLUENCE[biomeType];
+                const noiseValue = this.noiseGenerator.noise(x, y);
+                
+                if (noiseValue > influence) {
+                    // Try to match a neighboring biome instead
+                    const commonBiome = this.getMostCommonBiome(neighborBiomes);
+                    if (commonBiome && this.BIOME_INFLUENCE.hasOwnProperty(commonBiome)) {
+                        biomeType = commonBiome as keyof typeof this.BIOME_INFLUENCE;
+                    }
+                }
+            }
+        }
+
+        // Enhanced clustering for grasslands
+        if (biomeType === 'GRASSLAND') {
+            const neighbors = this.getNeighbors(x, y);
+            const neighborBiomes = neighbors.map(([nx, ny]) => 
+                this.grid[ny]?.[nx] || biomeType
+            );
+
+            // Count matching neighbors
+            const matchingNeighbors = neighborBiomes.filter(b => b === biomeType).length;
+            
+            // Stronger tendency to maintain biome type if it matches neighbors
+            if (matchingNeighbors >= 2) {
+                return biomeType;
+            }
+
+            // Try to match common neighbor biome
+            const commonBiome = this.getMostCommonBiome(neighborBiomes);
+            if (commonBiome && this.BIOME_INFLUENCE.hasOwnProperty(commonBiome)) {
+                const transitionChance = this.noiseGenerator.noise(x * 0.1, y * 0.1);
+                if (transitionChance > 0.3) {
+                    return commonBiome;
+                }
+            }
+        }
+
+        return biomeType;
+    }
+
+    private getBaseBiome(elevation: number, moisture: number): string {
         if (elevation < this.ELEVATION_THRESHOLDS.LOWLAND) {
             if (moisture < this.MOISTURE_THRESHOLDS.DRY) return 'GRASSLAND';
-            if (moisture < this.MOISTURE_THRESHOLDS.MODERATE) return 'SAVANNA';
             if (moisture < this.MOISTURE_THRESHOLDS.WET) return 'FOREST';
             return 'RAINFOREST';
         }
@@ -220,6 +282,24 @@ export default class TerrainGenerator {
         }
 
         return 'PEAK';
+    }
+
+    private getMostCommonBiome(biomes: string[]): string | null {
+        const counts = new Map<string, number>();
+        biomes.forEach(biome => {
+            counts.set(biome, (counts.get(biome) || 0) + 1);
+        });
+
+        let maxCount = 0;
+        let commonBiome = null;
+        counts.forEach((count, biome) => {
+            if (count > maxCount) {
+                maxCount = count;
+                commonBiome = biome;
+            }
+        });
+
+        return commonBiome;
     }
 
     private getDistanceFromCenter(x: number, y: number): number {
@@ -316,29 +396,63 @@ export default class TerrainGenerator {
         return rivers;
     }
 
+    private validateDeepWater(terrain: string[][]): string[][] {
+        const validated = terrain.map(row => [...row]);
+        let hasChanges;
+
+        do {
+            hasChanges = false;
+            for (let y = 0; y < this.height; y++) {
+                for (let x = 0; x < this.width; x++) {
+                    if (validated[y][x] === 'DEEP_WATER') {
+                        const neighbors = this.getNeighbors(x, y);
+                        const invalidNeighbors = neighbors.some(([nx, ny]) => {
+                            const neighborType = validated[ny][nx];
+                            return neighborType !== 'DEEP_WATER' && neighborType !== 'SHALLOW_WATER';
+                        });
+
+                        if (invalidNeighbors) {
+                            validated[y][x] = 'SHALLOW_WATER';
+                            hasChanges = true;
+                        }
+                    }
+                }
+            }
+        } while (hasChanges);
+
+        return validated;
+    }
+
     generate() {
-        // Update method call
         const elevation = this.generateElevation();
-
-        // Simulate water flow and erosion
         const { elevation: erodedElevation, water } = this.simulateWaterFlow(elevation);
-
-        // Calculate moisture levels
         const moisture = this.calculateMoisture(erodedElevation, water);
+
+        // Initialize grid with basic terrain
+        this.grid = Array(this.height).fill(0).map(() => Array(this.width).fill(null));
+        
+        // First pass: basic biome assignment
+        for (let y = 0; y < this.height; y++) {
+            for (let x = 0; x < this.width; x++) {
+                this.grid[y][x] = this.getBaseBiome(erodedElevation[y][x], moisture[y][x]);
+            }
+        }
+
+        // Second pass: biome clustering
+        const finalGrid = this.grid.map((row, y) =>
+            row.map((_, x) => this.getBiome(erodedElevation[y][x], moisture[y][x], x, y))
+        );
 
         // Generate rivers
         const rivers = this.generateRivers(erodedElevation);
 
-        // Determine biomes based on elevation and moisture
-        this.grid = erodedElevation.map((row: any[], y: number) =>
-            row.map((elevation: any, x: number) => {
-                const baseType = this.getBiome(elevation, moisture[y][x]);
-                return rivers.has(`${x},${y}`) ? 'RIVER' : baseType;
-            })
+        // Apply rivers
+        this.grid = finalGrid.map((row, y) =>
+            row.map((cell, x) => rivers.has(`${x},${y}`) ? 'RIVER' : cell)
         );
 
-        /* // Smooth the terrain to eliminate orphaned cells
-        this.grid = this.smoothTerrain(this.grid); */
+        // Validate deep water connections
+        this.grid = this.validateDeepWater(this.grid);
 
         return {
             terrain: this.grid,
